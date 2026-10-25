@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ku" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سەیرکردنی ڤیدیۆی یوتووب بە ژێرنووسی کوردی</title>
+    <!-- گرتنی فۆنتی جوانی کوردی (Rabar / NRT / Vazirmatn) -->
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Vazirmatn', sans-serif;
+        }
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        h1 {
+            color: #38bdf8;
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #94a3b8;
+        }
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: #1e293b;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            background: #0f172a;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus {
+            border-color: #38bdf8;
+        }
+        button {
+            padding: 12px 24px;
+            background-color: #0284c7;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #0369a1;
+        }
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* ڕێژەی 16:9 بۆ ڤیدیۆ */
+            height: 0;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .subtitle-section {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px dashed #334155;
+        }
+        .subtitle-section h3 {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            color: #38bdf8;
+        }
+        input[type="file"] {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+        /* شوێنی پیشاندانی ژێرنووس لەسەر ڤیدیۆ یان لە خوارەوە */
+        #subtitle-display {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #facc15;
+            min-height: 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>پەخشکاری ژێرنووسی کوردی بۆ یوتووب</h1>
+        <p>لێنکی ڤیدیۆی یوتووب دابنە و ژێرنووسەکەی (فایلی SRT) باربکە بۆ ئەوەی بە ئاسانکاری سەیری بکەیت</p>
+    </header>
+
+    <div class="container">
+        <!-- بەشی وەرگرتنی لێنکی یوتووب -->
+        <div class="input-group">
+            <input type="text" id="youtube-link" placeholder="لێنکی یوتووب لێرە دابنە (بۆ نموونە: https://youtu.be/...)">
+            <button onclick="loadVideo()">پەخشکردن</button>
+        </div>
+
+        <!-- پەنجەرەی ڤیدیۆ -->
+        <div class="video-wrapper">
+            <div id="player"></div>
+        </div>
+
+        <!-- بەشی بارکردنی ژێرنووس -->
+        <div class="subtitle-section">
+            <h3>فایلی ژێرنووسی کوردی (SRT.) هەڵبژێرە:</h3>
+            <input type="file" id="srt-file" accept=".srt" onchange="loadSubtitle(event)">
+        </div>
+
+        <!-- شوێنی نیشدانی دەقی ژێرنووس -->
+        <div id="subtitle-display"></div>
+    </div>
+
+    <!-- یوتیوب آی ڤی ئەی پی آی -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        let player;
+        let subtitles = [];
+
+        function onYouTubeIframeAPIReady() {
+            // سەرەتایەکی خاڵی بۆ پلەیەرەکە
+        }
+
+        function extractVideoId(url) {
+            let regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            let match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+
+        function loadVideo() {
+            let url = document.getElementById('youtube-link').value;
+            let videoId = extractVideoId(url);
+
+            if (!videoId) {
+                alert('تکایە لێنکێکی دروستی یوتووب دابنە!');
+                return;
+            }
+
+            if (player) {
+                player.loadVideoById(videoId);
+            } else {
+                player = new YT.Player('player', {
+                    height: '100%',
+                    width: '100%',
+                    videoId: videoId,
+                    events: {
+                        'onReady': onPlayerReady
+                    }
+                });
+            }
+        }
+
+        function onPlayerReady(event) {
+            // دەتوانین لێرە چاودێری کاتی ڤیدیۆ بکەین
+            setInterval(updateSubtitles, 200);
+        }
+
+        // خوێندنەوەی فایلی SRT
+        function loadSubtitle(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                subtitles = parseSRT(e.target.result);
+                alert('ژێرنووسەکە بە سەرکەوتوویی بارکرا!');
+            };
+            reader.readAsText(file);
+        }
+
+        // شیکارکردنی فایلی SRT بۆ دەق و کات
+        function parseSRT(data) {
+            const subtitleLines = data.replace(/\r/g, '').split('\n');
+            let subs = [];
+            let sub = {};
+            let i = 0;
+
+            while (i < subtitleLines.length) {
+                if (subtitleLines[i].trim() === '') {
+                    i++;
+                    continue;
+                }
+                // تێپەڕاندنی ژمارەی زنجیرە
+                i++; 
+                if (i >= subtitleLines.length) break;
+
+                // خوێندنەوەی کات (Timecodes)
+                let timeLine = subtitleLines[i];
+                if (timeLine && timeLine.includes('-->')) {
+                    let times = timeLine.split('-->');
+                    sub.start = parseTime(times[0].trim());
+                    sub.end = parseTime(times[1].trim());
+                    i++;
+                    
+                    let text = '';
+                    while (i < subtitleLines.length && subtitleLines[i].trim() !== '') {
+                        text += subtitleLines[i] + '<br>';
+                        i++;
+                    }
+                    sub.text = text;
+                    subs.push(sub);
+                    sub = {};
+                }
+                i++;
+            }
+            return subs;
+        }
+
+        function parseTime(timeString) {
+            let parts = timeString.split(':');
+            let secondsParts = parts[2].split(',');
+            let hours = parseInt(parts[0], 10);
+            let minutes = parseInt(parts[1], 10);
+            let seconds = parseInt(secondsParts[0], 10);
+            let milliseconds = parseInt(secondsParts[1], 10);
+            return (hours * 3600) + (minutes * 60) + seconds + (milliseconds / 1000);
+        }
+
+        // نیشاندانی ژێرنووس لەگەڵ کاتی ڤیدیۆدا
+        function updateSubtitles() {
+            if (!player || typeof player.getCurrentTime !== 'function') return;
+            let currentTime = player.getCurrentTime();
+            let currentSub = subtitles.find(sub => currentTime >= sub.start && currentTime <= sub.end);
+            
+            document.getElementById('subtitle-display').innerHTML = currentSub ? currentSub.text : '';
+        }
+    </script>
+</body>
+</html>
